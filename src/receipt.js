@@ -62,6 +62,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('invoiceBox').style.display = 'block';
 
+        // Analytics: Checkout Success
+        try {
+            fetch(`${API_BASE}/api/analytics/event`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ event: 'checkout_success', path: window.location.pathname })
+            }).catch(()=>console.log('Analytics disabled'));
+        } catch(e) {}
+
         // Auto imprimir
         setTimeout(() => {
             window.print();

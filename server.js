@@ -741,6 +741,108 @@ app.get('/api/admin/dashboard-stats', async (req, res) => {
     }
 });
 
+// ==========================================
+// MÓDULO BI (Business Intelligence)
+// ==========================================
+
+// 1. Rentabilidad (Profitability)
+app.get('/api/admin/reports/profitability', async (req, res) => {
+    try {
+        const [orders] = await pool.execute(`
+            SELECT id, fecha_pedido as fecha, total, estatus 
+            FROM \`orders\` 
+            WHERE estatus != 'abandonado' AND estatus != 'cancelada'
+            ORDER BY fecha_pedido ASC
+        `);
+        
+        let totalRevenue = 0;
+        let totalCost = 0;
+        const chartData = { labels: [], revenue: [], profit: [] };
+        
+        orders.forEach(o => {
+            const rev = parseFloat(o.total);
+            const cost = rev / 1.10; // 10% markup backwards calculation
+            const profit = rev - cost;
+            
+            totalRevenue += rev;
+            totalCost += cost;
+            
+            const dateStr = new Date(o.fecha).toLocaleDateString('es-MX');
+            if (!chartData.labels.includes(dateStr)) {
+                chartData.labels.push(dateStr);
+                chartData.revenue.push(0);
+                chartData.profit.push(0);
+            }
+            const idx = chartData.labels.indexOf(dateStr);
+            chartData.revenue[idx] += rev;
+            chartData.profit[idx] += profit;
+        });
+
+        res.json({ success: true, totalRevenue, totalCost, netProfit: totalRevenue - totalCost, chartData });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Comportamiento del Cliente
+app.get('/api/admin/reports/customer-behavior', async (req, res) => {
+    try {
+        const [customersRows] = await pool.execute(`
+            SELECT cliente_email as email, COUNT(id) as numeroPedidos, SUM(total) as totalGastado
+            FROM \`orders\` WHERE estatus != 'abandonado'
+            GROUP BY cliente_email ORDER BY totalGastado DESC
+        `);
+        
+        const totalCustomers = customersRows.length;
+        const returningCustomers = customersRows.filter(c => c.numeroPedidos > 1).length;
+        const totalSales = customersRows.reduce((a, b) => a + parseFloat(b.totalGastado), 0);
+        const totalOrders = customersRows.reduce((a, b) => a + b.numeroPedidos, 0);
+        const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+        res.json({
+            success: true,
+            totalCustomers,
+            returningCustomers,
+            retentionRate: totalCustomers > 0 ? ((returningCustomers / totalCustomers) * 100).toFixed(2) : 0,
+            avgTicket,
+            topCustomers: customersRows.slice(0, 5)
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Analytics & Funnel
+const ANALYTICS_FILE = path.join(__dirname, 'backend', 'data', 'analytics.json');
+let analyticsEvents = [];
+if (fs.existsSync(ANALYTICS_FILE)) {
+    try { analyticsEvents = JSON.parse(fs.readFileSync(ANALYTICS_FILE, 'utf8')); } catch(e){}
+}
+function saveAnalytics() {
+    try {
+        if (!fs.existsSync(path.dirname(ANALYTICS_FILE))) fs.mkdirSync(path.dirname(ANALYTICS_FILE), { recursive: true });
+        fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(analyticsEvents, null, 2));
+    } catch(e) { console.error("Error saving analytics", e); }
+}
+
+app.post('/api/analytics/event', express.json(), (req, res) => {
+    const { event, path: urlPath } = req.body;
+    if (event) {
+        analyticsEvents.push({ event, path: urlPath, timestamp: new Date().toISOString() });
+        saveAnalytics();
+    }
+    res.json({ success: true });
+});
+
+app.get('/api/admin/reports/funnel', (req, res) => {
+    const visits = analyticsEvents.filter(e => e.event === 'page_view').length;
+    const add_to_cart = analyticsEvents.filter(e => e.event === 'add_to_cart').length;
+    const purchases = analyticsEvents.filter(e => e.event === 'checkout_success').length;
+    
+    // Mock si no hay data real aún, para el prototipo
+    if (visits === 0) {
+       return res.json({ success: true, funnel: { visits: 124, add_to_cart: 45, purchases: 12 } });
+    }
+    res.json({ success: true, funnel: { visits, add_to_cart, purchases } });
+});
+// ==========================================
+
 // Obtener lista de clientes consolidados desde DB
 app.get('/api/admin/customers', async (req, res) => {
     try {

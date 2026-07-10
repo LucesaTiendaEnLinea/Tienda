@@ -212,6 +212,15 @@ function addToCart(sku, quantity = 1) {
     }
     saveCart(cart);
     
+    // Analytics: Add to Cart
+    try {
+        fetch(`${API_BASE}/api/analytics/event`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ event: 'add_to_cart', path: sku })
+        }).catch(()=>console.log('Analytics disabled'));
+    } catch(e) {}
+    
     // Feedback visual opcional
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:var(--color-primary); color:white; padding:12px 24px; border-radius:8px; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.15); animation: fadeUp 0.3s ease;';

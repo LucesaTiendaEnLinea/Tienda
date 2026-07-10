@@ -540,4 +540,97 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.removeChild(link);
         });
     }
+
+    // --- BI (Business Intelligence) Logic ---
+    let biLoaded = false;
+    async function loadBiReports() {
+        if (biLoaded) return;
+        try {
+            // 1. Profitability
+            const resProfit = await apiFetch('/api/admin/reports/profitability');
+            if (resProfit) {
+                const dataProfit = await resProfit.json();
+                if (dataProfit.success) {
+                    new Chart(document.getElementById('profitChart'), {
+                        type: 'line',
+                        data: {
+                            labels: dataProfit.chartData.labels,
+                            datasets: [
+                                { label: 'Ingresos Totales', data: dataProfit.chartData.revenue, borderColor: '#3182ce', backgroundColor: 'rgba(49,130,206,0.1)', fill: true, tension: 0.4 },
+                                { label: 'Ganancia Neta', data: dataProfit.chartData.profit, borderColor: '#38a169', backgroundColor: 'rgba(56,161,105,0.1)', fill: true, tension: 0.4 }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Ingresos vs Ganancia Neta' } } }
+                    });
+                }
+            }
+
+            // 2. Customer Behavior
+            const resCust = await apiFetch('/api/admin/reports/customer-behavior');
+            if (resCust) {
+                const dataCust = await resCust.json();
+                if (dataCust.success) {
+                    document.getElementById('biAvgTicket').textContent = formatPrice(dataCust.avgTicket);
+                    document.getElementById('biRetention').textContent = `${dataCust.retentionRate}%`;
+                }
+            }
+            
+            // Payment Methods Chart
+            const resStats = await apiFetch('/api/admin/dashboard-stats');
+            if (resStats) {
+                const dataStats = await resStats.json();
+                const pmLabels = Object.keys(dataStats.paymentMethods || {});
+                const pmData = Object.values(dataStats.paymentMethods || {});
+                if (pmLabels.length > 0) {
+                    new Chart(document.getElementById('paymentMethodsChart'), {
+                        type: 'doughnut',
+                        data: { labels: pmLabels, datasets: [{ data: pmData, backgroundColor: ['#3182ce', '#38a169', '#ecc94b', '#e53e3e', '#718096'] }] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Métodos de Pago' }, legend: { position: 'bottom' } } }
+                    });
+                }
+            }
+
+            // 3. Funnel
+            const resFunnel = await apiFetch('/api/admin/reports/funnel');
+            if (resFunnel) {
+                const dataFunnel = await resFunnel.json();
+                if (dataFunnel.success) {
+                    const f = dataFunnel.funnel;
+                    new Chart(document.getElementById('funnelChart'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Visitas', 'Agregados', 'Compras'],
+                            datasets: [{ label: 'Usuarios', data: [f.visits, f.add_to_cart, f.purchases], backgroundColor: ['#3182ce', '#ecc94b', '#38a169'] }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Embudo de Conversión' }, legend: { display: false } } }
+                    });
+                }
+            }
+
+            // 4. Inventory Top Sellers & Low Stock
+            const resInv = await apiFetch('/api/admin/inventory');
+            if (resInv) {
+                const dataInv = await resInv.json();
+                const items = dataInv.items || [];
+                const topSellers = [...items].sort((a, b) => b.vendidos - a.vendidos).slice(0, 5);
+                const topSellersHtml = topSellers.map(p => `<li><strong>${p.sku}</strong> - <span style="font-size:0.9rem">${p.nombre}</span> (<b style="color:var(--admin-success)">${p.vendidos}</b> vendidos)</li>`).join('');
+                document.getElementById('biTopSellers').innerHTML = topSellersHtml || '<li>No hay ventas registradas</li>';
+                
+                const lowStock = items.filter(p => p.stock > 0 && p.stock <= 5).slice(0, 5);
+                const lowStockHtml = lowStock.map(p => `<li><strong>${p.sku}</strong> - Quedan solo <b>${p.stock}</b> pzas</li>`).join('');
+                document.getElementById('biLowStock').innerHTML = lowStockHtml || '<li>Stock saludable</li>';
+            }
+
+            biLoaded = true;
+        } catch(e) { console.error("Error loading BI:", e); }
+    }
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (link.getAttribute('data-target') === 'view-reports') {
+                loadBiReports();
+            }
+        });
+    });
+
 });
