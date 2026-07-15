@@ -8,7 +8,7 @@
 
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:3001'
-  : 'https://lucesademexico-shop.com.mx'; // Ruta relativa para producción (Hostinger)
+  : 'https://api.lucesademexico-shop.com.mx'; // Ruta relativa para producción (Hostinger)
 
 let sessionExpiredAlertShown = false;
 
