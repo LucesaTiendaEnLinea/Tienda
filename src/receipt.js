@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Obtenemos todas las ventas del backend y buscamos la que necesitamos
         const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
           ? 'http://localhost:3001'
-          : 'https://api.lucesademexico-shop.com.mx';
+          : '';
         const res = await fetch(`${API_BASE}/api/admin/sales`);
 
         const sales = await res.json();

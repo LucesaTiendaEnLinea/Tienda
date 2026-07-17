@@ -177,9 +177,13 @@ async function downloadCatalog() {
     }
 }
 
-// Automatically sync catalog on startup, then every 15 minutes
-downloadCatalog();
-setInterval(downloadCatalog, 15 * 60 * 1000);
+// Automatically sync catalog on startup, then every 15 minutes (Local/VPS only)
+if (!process.env.VERCEL) {
+    downloadCatalog();
+    setInterval(downloadCatalog, 15 * 60 * 1000);
+} else {
+    console.log("Vercel environment detected. Skipping background FTP sync.");
+}
 
 // --- 3. Express Endpoints for our Frontend ---
 
@@ -964,6 +968,11 @@ app.get('*', (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Master Server (backend) running on port ${PORT}`);
-});
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`🚀 Master Server (backend) running on port ${PORT}`);
+    });
+}
+
+// Exportar la aplicación para Vercel Serverless Functions
+export default app;
